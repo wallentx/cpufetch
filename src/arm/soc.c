@@ -179,6 +179,13 @@ bool match_broadcom(char* soc_name, struct system_on_chip* soc) {
 bool match_google(char* soc_name, struct system_on_chip* soc) {
   char* tmp;
 
+  // Android ro.soc.model, observed on Pixel 11 Pro XL.
+  // TSMC 3nm confirmed at launch: https://www.cna.com.tw/news/ait/202608130173.aspx
+  if(strcmp(soc_name, "Tensor G6") == 0) {
+    fill_soc(soc, "Tensor G6", SOC_GOOGLE_TENSOR_G6, 3);
+    return true;
+  }
+
   if((tmp = strstr(soc_name, "gs")) == NULL)
     return false;
 
@@ -741,6 +748,13 @@ bool match_special(char* soc_name, struct system_on_chip* soc) {
   if(strcmp(soc_name, "husky") == 0 ||
      strcmp(soc_name, "zuma") == 0) {
     fill_soc(soc, "Tensor G3", SOC_GOOGLE_TENSOR_G3, 4);
+    return true;
+  }
+
+  // Google Pixel 11 Pro XL: ro.product.board and ro.board.platform.
+  if(strcmp(soc_name, "kodiak") == 0 ||
+     strcmp(soc_name, "malibu") == 0) {
+    fill_soc(soc, "Tensor G6", SOC_GOOGLE_TENSOR_G6, 3);
     return true;
   }
 

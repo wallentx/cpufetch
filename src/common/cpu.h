@@ -132,7 +132,12 @@ struct features {
   bool CRC32;
   bool SVE;
   bool SVE2;
+  bool SME;
+  bool SME2;
   uint64_t cntb;
+  uint64_t sme_vl; // Streaming vector length in bytes; zero if unavailable.
+  uint64_t hwcaps[3];
+  bool hwcaps_valid;
 #endif  
 };
 

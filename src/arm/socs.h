@@ -395,6 +395,7 @@ enum {
   SOC_GOOGLE_TENSOR,
   SOC_GOOGLE_TENSOR_G2,
   SOC_GOOGLE_TENSOR_G3,
+  SOC_GOOGLE_TENSOR_G6,
   // NVIDIA,
   SOC_TEGRA_2,
   SOC_TEGRA_3,
@@ -448,7 +449,7 @@ inline static VENDOR get_soc_vendor_from_soc(SOC soc) {
   else if(soc >= SOC_APPLE_M1 && soc <= SOC_APPLE_M3_MAX) return SOC_VENDOR_APPLE;
   else if(soc >= SOC_ALLWINNER_A10 && soc <= SOC_ALLWINNER_R328) return SOC_VENDOR_ALLWINNER;
   else if(soc >= SOC_ROCKCHIP_3288 && soc <= SOC_ROCKCHIP_3588) return SOC_VENDOR_ROCKCHIP;
-  else if(soc >= SOC_GOOGLE_TENSOR && soc <= SOC_GOOGLE_TENSOR_G3) return SOC_VENDOR_GOOGLE;
+  else if(soc >= SOC_GOOGLE_TENSOR && soc <= SOC_GOOGLE_TENSOR_G6) return SOC_VENDOR_GOOGLE;
   else if(soc >= SOC_TEGRA_2 && soc <= SOC_TEGRA_ORIN) return SOC_VENDOR_NVIDIA;
   else if(soc >= SOC_AMPERE_ALTRA && soc <= SOC_AMPERE_ALTRA) return SOC_VENDOR_AMPERE;
   else if(soc >= SOC_NXP_IMX8QM && soc <= SOC_NXP_IMX93) return SOC_VENDOR_NXP;

@@ -43,7 +43,7 @@ ifneq ($(OS),Windows_NT)
 	else ifeq ($(arch), $(filter $(arch), arm aarch64_be aarch64 arm64 armv8b armv8l armv7l armv6l))
 		SRC_DIR=src/arm/
 		SOURCE += $(COMMON_SRC) $(SRC_DIR)midr.c $(SRC_DIR)uarch.c $(SRC_COMMON)soc.c $(SRC_DIR)soc.c $(SRC_COMMON)pci.c $(SRC_DIR)udev.c sve.o
-		HEADERS += $(COMMON_HDR) $(SRC_DIR)midr.h $(SRC_DIR)uarch.h  $(SRC_COMMON)soc.h $(SRC_DIR)soc.h $(SRC_COMMON)pci.h $(SRC_DIR)udev.c $(SRC_DIR)socs.h
+		HEADERS += $(COMMON_HDR) $(SRC_DIR)midr.h $(SRC_DIR)uarch.h  $(SRC_COMMON)soc.h $(SRC_DIR)soc.h $(SRC_COMMON)pci.h $(SRC_DIR)udev.c $(SRC_DIR)socs.h $(SRC_DIR)hwcaps.h
 		CFLAGS += -DARCH_ARM -Wno-unused-parameter -std=c99 -fstack-protector-all
 
 		# Check if the compiler supports -march=armv8-a+sve. We will use it (if supported) to compile SVE detection code later
@@ -81,7 +81,7 @@ else
 	else ifeq ($(arch), $(filter $(arch), arm aarch64_be aarch64 arm64 armv8b armv8l armv7l armv6l))
 		SRC_DIR=src/arm/
 		SOURCE += $(COMMON_SRC) $(SRC_DIR)midr.c $(SRC_DIR)uarch.c $(SRC_COMMON)soc.c $(SRC_DIR)soc.c $(SRC_COMMON)pci.c $(SRC_DIR)udev.c sve.o
-		HEADERS += $(COMMON_HDR) $(SRC_DIR)midr.h $(SRC_DIR)uarch.h  $(SRC_COMMON)soc.h $(SRC_DIR)soc.h $(SRC_COMMON)pci.h $(SRC_DIR)udev.c $(SRC_DIR)socs.h
+		HEADERS += $(COMMON_HDR) $(SRC_DIR)midr.h $(SRC_DIR)uarch.h  $(SRC_COMMON)soc.h $(SRC_DIR)soc.h $(SRC_COMMON)pci.h $(SRC_DIR)udev.c $(SRC_DIR)socs.h $(SRC_DIR)hwcaps.h
 		CFLAGS += -DARCH_ARM -std=c99
 	else
 		# Error lines should not be tabulated because Makefile complains about it

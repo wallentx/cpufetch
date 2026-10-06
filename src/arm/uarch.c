@@ -35,7 +35,8 @@ enum {
   ISA_ARMv8_5_A,
   ISA_ARMv8_6_A,
   ISA_ARMv9_A,
-  ISA_ARMv9_2_A
+  ISA_ARMv9_2_A,
+  ISA_ARMv9_3_A
 };
 
 static const ISA isas_uarch[] = {
@@ -77,6 +78,8 @@ static const ISA isas_uarch[] = {
   [UARCH_CORTEX_X3]    = ISA_ARMv9_A,
   [UARCH_CORTEX_X4]    = ISA_ARMv9_2_A,
   [UARCH_CORTEX_X925]  = ISA_ARMv9_2_A,
+  [UARCH_C1_PRO]       = ISA_ARMv9_3_A,
+  [UARCH_C1_ULTRA]     = ISA_ARMv9_3_A,
   [UARCH_NEOVERSE_N1]  = ISA_ARMv8_2_A,
   [UARCH_NEOVERSE_N2]  = ISA_ARMv9_A,
   [UARCH_NEOVERSE_E1]  = ISA_ARMv8_2_A,
@@ -130,6 +133,7 @@ static char* isas_string[] = {
   [ISA_ARMv8_6_A] = "ARMv8.6",
   [ISA_ARMv9_A] = "ARMv9",
   [ISA_ARMv9_2_A] = "ARMv9.2",
+  [ISA_ARMv9_3_A] = "ARMv9.3",
 };
 
 #define UARCH_START if (false) {}
@@ -219,6 +223,9 @@ struct uarch* get_uarch_from_midr(uint32_t midr, struct cpuInfo* cpu) {
   CHECK_UARCH(arch, cpu, 'A', 0xD84, NA, NA, "Neoverse V3",           UARCH_NEOVERSE_V3,  CPU_VENDOR_ARM)
   CHECK_UARCH(arch, cpu, 'A', 0xD85, NA, NA, "Cortex-X925",           UARCH_CORTEX_X925,  CPU_VENDOR_ARM)
   CHECK_UARCH(arch, cpu, 'A', 0xD87, NA, NA, "Cortex-A725",           UARCH_CORTEX_A725,  CPU_VENDOR_ARM)
+  // https://github.com/util-linux/util-linux/blob/master/sys-utils/lscpu-arm.c
+  CHECK_UARCH(arch, cpu, 'A', 0xD8B, NA, NA, "C1-Pro",                UARCH_C1_PRO,      CPU_VENDOR_ARM)
+  CHECK_UARCH(arch, cpu, 'A', 0xD8C, NA, NA, "C1-Ultra",              UARCH_C1_ULTRA,    CPU_VENDOR_ARM)
 
   CHECK_UARCH(arch, cpu, 'B', 0x00F, NA, NA, "Brahma B15",            UARCH_BRAHMA_B15,   CPU_VENDOR_BROADCOM)
   CHECK_UARCH(arch, cpu, 'B', 0x100, NA, NA, "Brahma B53",            UARCH_BRAHMA_B53,   CPU_VENDOR_BROADCOM)
@@ -332,6 +339,9 @@ int get_number_of_vpus(struct cpuInfo* cpu) {
   MICROARCH ua = cpu->arch->uarch;
 
   switch(ua) {
+    case UARCH_UNKNOWN:
+      return -1;
+    case UARCH_C1_ULTRA:   // https://developer.arm.com/documentation/111079/3-0
     case UARCH_CORTEX_X925: // [https://www.anandtech.com/show/21399/arm-unveils-2024-cpu-core-designs-cortex-x925-a725-and-a520-arm-v9-2-redefined-for-3nm-/2]
       return 6;
     case UARCH_EVEREST:     // Just a guess, needs confirmation.
@@ -373,6 +383,7 @@ int get_number_of_vpus(struct cpuInfo* cpu) {
     case UARCH_CORTEX_A715: // [https://www.hwcooling.net/en/arm-introduces-new-cortex-a715-core-architecture-analysis/]: "the numbers of ALU and FPU execution units themselves >
     case UARCH_CORTEX_A720: // Assuming same as A715: https://www.anandtech.com/show/18871/arm-unveils-armv92-mobile-architecture-cortex-x4-a720-and-a520-64bit-exclusive/3
     case UARCH_CORTEX_A725: // Assuming same as A720
+    case UARCH_C1_PRO:     // Arm C1-Pro Software Optimization Guide 109879: non-streaming FP/ASIMD throughput.
       return 2;
     case UARCH_NEOVERSE_E1: // [https://www.anandtech.com/show/13959/arm-announces-neoverse-n1-platform/5]
     // A510 is integrated as part of a Complex. Normally, each complex would incorporate two Cortex-A510 cores.

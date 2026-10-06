@@ -120,7 +120,11 @@ static const AttributeField ATTRIBUTE_INFO[] = {
   { ATTRIBUTE_L1d,         "L1d Size:",          "L1d Size:"      },
   { ATTRIBUTE_L2,          "L2 Size:",           "L2 Size:"       },
   { ATTRIBUTE_L3,          "L3 Size:",           "L3 Size:"       },
+#ifdef ARCH_ARM
+  { ATTRIBUTE_PEAK,        "FP32 Vector Peak:",  "FP32 Vec. Peak:" },
+#else
   { ATTRIBUTE_PEAK,        "Peak Performance:",  "Peak Perf.:"    },
+#endif
 };
 
 struct terminal {
@@ -886,9 +890,7 @@ bool print_cpufetch_arm(struct cpuInfo* cpu, STYLE s, struct color** cs, struct 
     setAttribute(art, ATTRIBUTE_UARCH, uarch);
     setAttribute(art, ATTRIBUTE_FREQUENCY, max_frequency);
     setAttribute(art, ATTRIBUTE_NCORES, n_cores);
-    if(features != NULL) {
-      setAttribute(art, ATTRIBUTE_FEATURES, features);
-    }
+    if(features) setAttribute(art, ATTRIBUTE_FEATURES, features);
   }
   else {
     struct cpuInfo* ptr = cpu;
@@ -903,9 +905,7 @@ bool print_cpufetch_arm(struct cpuInfo* cpu, STYLE s, struct color** cs, struct 
       setAttribute(art, ATTRIBUTE_UARCH, uarch);
       setAttribute(art, ATTRIBUTE_FREQUENCY, max_frequency);
       setAttribute(art, ATTRIBUTE_NCORES, n_cores);
-      if(features != NULL) {
-        setAttribute(art, ATTRIBUTE_FEATURES, features);
-      }
+      if(features) setAttribute(art, ATTRIBUTE_FEATURES, features);
     }
   }
   char* pp = get_str_peak_performance(cpu->peak_performance);
@@ -933,6 +933,7 @@ bool print_cpufetch_arm(struct cpuInfo* cpu, STYLE s, struct color** cs, struct 
 
   print_ascii_arm(art, longest_attribute, term->w, use_short);
 
+  free(features);
   free(manufacturing_process);
   free(pp);
 

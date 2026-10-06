@@ -7,6 +7,7 @@
 
 #ifdef __linux__
   #include <sys/auxv.h>
+  #include <sys/prctl.h>
   #include <asm/hwcap.h>
   #include "../common/freq.h"
 #elif defined __APPLE__ || __MACH__
@@ -24,6 +25,7 @@
 #include "midr.h"
 #include "uarch.h"
 #include "sve.h"
+#include "hwcaps.h"
 
 
 #if defined _WIN32
@@ -155,10 +157,15 @@ int64_t get_peak_performance(struct cpuInfo* cpu) {
 
   for(int i=0; i < cpu->num_cpus; ptr = ptr->next_cpu, i++) {
     int vpus = get_number_of_vpus(ptr);
+    if(vpus <= 0) return -1;
     int vpus_width = get_vpus_width(ptr);
+    if(vpus_width <= 0) return -1;
     bool has_fma = has_fma_support(ptr);
 
-    int64_t flops = ptr->topo->total_cores * get_freq(ptr->freq) * 1000000 * vpus * (vpus_width/32);
+    // Non-streaming FP32 only: cores * Hz * vector FMA issue rate * FP32 lanes.
+    // SME is a separate, potentially shared engine with independent DVFS; its
+    // streaming vector length must not be substituted for this vector width.
+    int64_t flops = ptr->topo->total_cores * get_freq(ptr->freq) * INT64_C(1000000) * vpus * (vpus_width/32);
     if(has_fma) flops = flops * 2;
 
     total_flops += flops;
@@ -207,21 +214,19 @@ void init_cpu_info(struct cpuInfo* cpu) {
 // ARM32 https://elixir.bootlin.com/linux/latest/source/arch/arm/include/uapi/asm/hwcap.h
 // ARM64 https://elixir.bootlin.com/linux/latest/source/arch/arm64/include/uapi/asm/hwcap.h
 struct features* get_features_info(void) {
-  struct features* feat = emalloc(sizeof(struct features));
-  bool *ptr = &(feat->AES);
-  for(uint32_t i = 0; i < sizeof(struct features)/sizeof(bool); i++, ptr++) {
-    *ptr = false;
-  }
+  struct features* feat = ecalloc(1, sizeof(struct features));
 
 #ifdef __linux__
   errno = 0;
-  long hwcaps = getauxval(AT_HWCAP);
+  unsigned long hwcaps = getauxval(AT_HWCAP);
 
   if(errno == ENOENT) {
     printWarn("Unable to retrieve AT_HWCAP using getauxval");
   }
 #ifdef __aarch64__
   else {
+    feat->hwcaps_valid = true;
+    feat->hwcaps[0] = hwcaps;
     feat->AES = hwcaps & HWCAP_AES;
     feat->CRC32 = hwcaps & HWCAP_CRC32;
     feat->SHA1 = hwcaps & HWCAP_SHA1;
@@ -234,9 +239,10 @@ struct features* get_features_info(void) {
       printWarn("Unable to retrieve AT_HWCAP2 using getauxval");
     }
     else {
-      #ifdef HWCAP2_SVE2
-        feat->SVE2 = hwcaps & HWCAP2_SVE2;
-      #endif
+      feat->hwcaps[1] = hwcaps;
+      feat->SVE2 = hwcaps & (1UL << 1);
+      feat->SME = hwcaps & (1UL << 23);
+      feat->SME2 = hwcaps & (1UL << 37);
     }
   }
 #else
@@ -311,6 +317,16 @@ struct features* get_features_info(void) {
   if (feat->SVE || feat->SVE2) {
     feat->cntb = sve_cntb();
   }
+
+#if defined(__linux__) && defined(__aarch64__)
+  // AT_HWCAP3 is ABI entry 29; older kernels return zero/ENOENT.
+  feat->hwcaps[2] = getauxval(29);
+  if(feat->SME) {
+    // PR_SME_GET_VL (64) reads the current thread's SVL without changing it.
+    int vl = prctl(64, 0L, 0L, 0L, 0L);
+    if(vl >= 0) feat->sme_vl = vl & 0xffff;
+  }
+#endif
 
   return feat;
 }
@@ -611,9 +627,34 @@ char* get_str_topology(struct cpuInfo* cpu, struct topology* topo, bool dual_soc
   return string;
 }
 
+char* get_str_features_full(struct cpuInfo* cpu) {
+  struct features* feat = cpu->feat;
+  if(feat->hwcaps_valid) {
+    // Each of 192 bits needs at most 32 bytes including its comma and NUL.
+    char* result = ecalloc(3 * 64 * 32, 1);
+    for(unsigned bank = 0; bank < 3; bank++) {
+      for(unsigned bit = 0; bit < 64; bit++) {
+        if(!(feat->hwcaps[bank] & (UINT64_C(1) << bit))) continue;
+        const char* name = arm_hwcap_names[bank][bit];
+        char unknown[32];
+        if(name == NULL) {
+          snprintf(unknown, sizeof(unknown), "HWCAP%u_BIT%u", bank + 1, bit);
+          name = unknown;
+        }
+        if(result[0]) strcat(result, ",");
+        strcat(result, name);
+      }
+    }
+    if(result[0]) return result;
+    free(result);
+    return NULL;
+  }
+  return get_str_features(cpu);
+}
+
 char* get_str_features(struct cpuInfo* cpu) {
   struct features* feat = cpu->feat;
-  uint32_t max_len = strlen("NEON,SHA1,SHA2,AES,CRC32,SVE,SVE2,") + 1;
+  uint32_t max_len = strlen("NEON,SHA1,SHA2,AES,CRC32,SVE,SVE2,SME,SME2,") + 1;
   uint32_t len = 0;
   char* string = ecalloc(max_len, sizeof(char));
 
@@ -627,6 +668,14 @@ char* get_str_features(struct cpuInfo* cpu) {
   }
   if(feat->SVE2) {
     strcat(string, "SVE2,");
+    len += 5;
+  }
+  if(feat->SME) {
+    strcat(string, "SME,");
+    len += 4;
+  }
+  if(feat->SME2) {
+    strcat(string, "SME2,");
     len += 5;
   }
   if(feat->SHA1) {
@@ -650,8 +699,10 @@ char* get_str_features(struct cpuInfo* cpu) {
     string[len-1] = '\0';
     return string;
   }
-  else
+  else {
+    free(string);
     return NULL;
+  }
 }
 
 void print_debug(struct cpuInfo* cpu) {
@@ -681,6 +732,30 @@ void print_debug(struct cpuInfo* cpu) {
   if (cpu->feat->SVE || cpu->feat->SVE2) {
     printf("- cntb: %d\n", (int) cpu->feat->cntb);
   }
+
+  char* features = get_str_features_full(cpu);
+  if(features) {
+    printf("- Features: %s\n", features);
+    free(features);
+  }
+  if(cpu->feat->hwcaps_valid) {
+    for(unsigned bank = 0; bank < 3; bank++)
+      printf("- HWCAP%u: 0x%016llx\n", bank + 1,
+             (unsigned long long) cpu->feat->hwcaps[bank]);
+  }
+  if(cpu->feat->SME) {
+    if(cpu->feat->sme_vl)
+      printf("- SME streaming vector length: %llu bits\n",
+             (unsigned long long) cpu->feat->sme_vl * 8);
+    else
+      printf("- SME streaming vector length: unknown\n");
+    printf("- SME FP32 peak: unknown (shared engine count and clock unavailable)\n");
+  }
+  if(cpu->peak_performance >= 0)
+    printf("- FP32 vector peak: %.3f GFLOP/s (theoretical, excludes SME)\n",
+           (double) cpu->peak_performance / 1e9);
+  else
+    printf("- FP32 vector peak: unknown\n");
 
   #if defined(__APPLE__) || defined(__MACH__)
     printf("hw.cpufamily: 0x%.8X\n", get_sys_info_by_name("hw.cpufamily"));
